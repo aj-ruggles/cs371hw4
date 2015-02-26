@@ -1,5 +1,4 @@
 local composer = require( "composer" )
-local Brick = require( "Brick" )
 local physics = require("physics")
 local scene = composer.newScene()
 
@@ -8,15 +7,18 @@ local scene = composer.newScene()
 -- -----------------------------------------------------------------------------------------------------------------
 physics.start()
 physics.setGravity( 0, 0 )
-physics.setDrawMode( "hybrid" )
-
-
-local brickOptions = {
-    width = 98,
-    height = 28,
-}
+-- physics.setDrawMode( "hybrid" )
 
 local ball, paddle, playArea
+local red, blue, yellow, gray = 1, 2, 3, 4
+local colorTable = { [1] = "red", [2] = "blue", [3] = "yellow", [4] = "gray" }
+local brickTable = {}
+
+local function swapColor( obj )
+    if obj.color == red then obj.color = blue; obj:setFillColor(0,0,1)
+    elseif obj.color == blue then obj.color = red; obj:setFillColor(1,0,0) 
+    end
+end
 -- -------------------------------------------------------------------------------
 
 
@@ -31,7 +33,47 @@ function scene:create( event )
     playArea:setFillColor(.3,.3,.3,.7)
 
     paddle = display.newRect( sceneGroup, display.contentCenterX, display.contentHeight-100, 200, 20 )
+
+    local function move ( event )
+        if event.phase == "began" then     
+            paddle.markX = paddle.x 
+        elseif event.phase == "moved" then     
+            local x = (event.x - event.xStart) + paddle.markX     
+            if (x <= 20 + paddle.width/2) then
+                paddle.x = 20+paddle.width/2;
+            elseif (x >= display.contentWidth-20-paddle.width/2) then
+                paddle.x = display.contentWidth-20-paddle.width/2;
+            else
+                paddle.x = x;      
+            end
+        end
+    end
+
+
+    Runtime:addEventListener("touch", move);
+
+
+
+
     ball   = display.newCircle( sceneGroup, display.contentCenterX, display.contentCenterY, 20 )
+
+    local function ballCollisionDetected( event )
+        if event.phase == "ended" and event.other.color then
+            if event.other.color == 1 then
+                table.remove(brickTable, event.other.id)
+                event.other:removeSelf()
+                event.other = nil
+            elseif event.other.color == 2 then
+                swapColor(event.other)
+            elseif event.other.color == 3 then
+                for i=1, #brickTable do
+                    swapColor(brickTable[i])
+                end
+            end
+        end
+        -- body
+    end
+    ball:addEventListener("collision", ballCollisionDetected )
 
     physics.addBody( playArea, "static", {
         chain={ -display.contentCenterX,-display.contentCenterY, display.contentCenterX, -display.contentCenterY, display.contentCenterX,display.contentCenterY, -display.contentCenterX,display.contentCenterY },
@@ -43,7 +85,7 @@ function scene:create( event )
         friction = 0,
         bounce = 1,
     })
-    physics.addBody( ball, "dynamic", {
+    physics.addBody( ball, "kinimatic", {
         radius = 20,
         bounce = 1,
         friction = 0,
@@ -57,36 +99,34 @@ function scene:show( event )
     local sceneGroup = self.view
     local phase = event.phase
 
-    local colorTable = { [1] = "red", [2] = "blue", [3] = "yellow", [4] = "gray"}
-    local brickTable = { ["breakable"] = 16, ["yellow"] = 2, ["gray"] = 6 }
-    local totalBricks = 24
-
-    local function createBrickTable()
-        if totalBricks <= 24 and totalBricks > 18 then
-        elseif 
-    end
-
     if ( phase == "will" ) then
         -- Called when the scene is still off screen (but is about to come on screen).
-        local x, y = 90, 130
-        local brick
+        
+        local function setColor( obj )
+
+        end
+
+        local x, y = 90, 100
+        local brickId = 1
         for i=1,4 do
             for j=1,6 do
-                local brick = Brick:new(brickOptions, x, y, colorTable[math.random(1,4)])
-                brick.brick.anchorX = 0; brick.brick.anchorY = 0
-                sceneGroup:insert( brick.brick )
-                x = x + 100
+                brickTable[brickId] = display.newRect(x, y, 98, 38)
+                brick = brickTable[brickId]
+                brick.anchorX=0;brick.anchorY=0
+                brick.id = brickId
+                brick.color = 2
+                brick:setFillColor(0,0,1)
+                physics.addBody(brick, "static" ) 
+                sceneGroup:insert( brick )
+                x = x + 100; brickId = brickId + 1
             end
             if i == 1 or i == 3 then x = 30 else x = 90 end
-            y = y + 30
+            y = y + 40
         end
 
 
     elseif ( phase == "did" ) then
-        --local brick = Brick:new(brickOptions, 100, 100, "red")
-        --brick:swapColor()
-
-        ball:applyForce(math.random(-3, 3), math.random(5, 8))
+        ball:applyForce(0, 8000)
         -- Called when the scene is now on screen.
         -- Insert code here to make the scene come alive.
         -- Example: start timers, begin animation, play audio, etc.
