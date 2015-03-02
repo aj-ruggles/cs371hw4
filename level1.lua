@@ -7,17 +7,84 @@ local scene = composer.newScene()
 -- -----------------------------------------------------------------------------------------------------------------
 physics.start()
 physics.setGravity( 0, 0 )
--- physics.setDrawMode( "hybrid" )
+--physics.setDrawMode( "hybrid" )
 
-local ball, paddle, playArea
-local red, blue, yellow, gray = 1, 2, 3, 4
-local colorTable = { [1] = "red", [2] = "blue", [3] = "yellow", [4] = "gray" }
+local gameEnded = false
+
+local ball, paddle, playArea, endArea, endText
+local red, blue, yellow, gray, death = 1, 2, 3, 4, 5
+
+local numRed = math.random(6, 10)
+local numBlue = math.abs(numRed - 16)
+local numYellow = 2
+local numGray = 6
+local totalNumOfBricks = 24
+local numOfBircksToWin = 8
+local message = "Fail"
+
 local brickTable = {}
+local colorTable = {}
+
+local paintGray = {
+    type = "gradient",
+    color1 = { .4,.4,.4 },
+    color2 = { .5,.5,.5 },
+    direction = "down"
+}
+
+local paintYellow = {
+    type = "gradient",
+    color1 = { .8,.8,0 },
+    color2 = { 1,1,0 },
+    direction = "down"
+}
+
+local paintRed = {
+    type = "gradient",
+    color1 = { .8,0,0 },
+    color2 = { 1,0,0 },
+    direction = "down"
+}
+
+local paintBlue = {
+    type = "gradient",
+    color1 = { 0,0,.8 },
+    color2 = { 0,0,1 },
+    direction = "down"
+}
+
 
 local function swapColor( obj )
-    if obj.color == red then obj.color = blue; obj:setFillColor(0,0,1)
-    elseif obj.color == blue then obj.color = red; obj:setFillColor(1,0,0) 
+    if obj.color == red then
+        obj.color = blue
+        obj:setFillColor( paintBlue )
+    elseif obj.color == blue then
+        obj.color = red
+        obj:setFillColor( paintRed )
     end
+end
+
+local function endGame()
+    physics.setGravity( 0, 5 )
+    gameEnded = true
+    for i,v in ipairs(brickTable) do
+        v.bodyType = "dynamic"
+        v:applyForce(math.random(-10, 10), math.random(-10, 10))
+    end
+
+    paddle:removeSelf()
+    paddle = nil
+
+    ball:removeSelf()
+    ball = nil
+
+    if totalNumOfBricks == numOfBircksToWin then
+        endText.text = "Win"
+    else
+        physics.addBody( endText, "dynamic" )
+    end
+    endText.alpha = 1
+
 end
 -- -------------------------------------------------------------------------------
 
@@ -29,67 +96,96 @@ function scene:create( event )
 
     -- Initialize the scene here.
     -- Example: add display objects to "sceneGroup", add touch listeners, etc.
+
     playArea = display.newRect( sceneGroup, display.contentCenterX, display.contentCenterY, display.contentWidth, display.contentHeight)
-    playArea:setFillColor(.3,.3,.3,.7)
+    playArea:setFillColor( .15,.15,.15 )
+
+    local options =
+    {
+        parent = sceneGroup,
+        text = message,
+        x = display.contentCenterX,
+        y = display.contentCenterY-100,
+        font = native.systemFont,
+        fontSize = 64,
+    }
+    endText = display.newText( options )
+    endText.alpha = 0
+
+    endArea = display.newRect( sceneGroup, display.contentCenterX, display.contentHeight-1, display.contentWidth, 2 )
+    endArea.color = 5
 
     paddle = display.newRect( sceneGroup, display.contentCenterX, display.contentHeight-100, 200, 20 )
-
-    local function move ( event )
-        if event.phase == "began" then     
-            paddle.markX = paddle.x 
-        elseif event.phase == "moved" then     
-            local x = (event.x - event.xStart) + paddle.markX     
+    paddle.markX = paddle.x
+    local function move( event )
+        if gameEnded == true then
+            Runtime:removeEventListener("touch", move)
+        elseif event.phase == "began" then
+            paddle.markX = paddle.x
+        elseif event.phase == "moved" then
+            local x = (event.x - event.xStart) + paddle.markX
             if (x <= 20 + paddle.width/2) then
-                paddle.x = 20+paddle.width/2;
+                paddle.x = 20+paddle.width/2
             elseif (x >= display.contentWidth-20-paddle.width/2) then
-                paddle.x = display.contentWidth-20-paddle.width/2;
+                paddle.x = display.contentWidth-20-paddle.width/2
             else
-                paddle.x = x;      
+                paddle.x = x
             end
         end
     end
+    Runtime:addEventListener("touch", move)
 
-
-    Runtime:addEventListener("touch", move);
-
-
-
-
-    ball   = display.newCircle( sceneGroup, display.contentCenterX, display.contentCenterY, 20 )
-
+    ball = display.newCircle( sceneGroup, display.contentCenterX, display.contentCenterY-200, 20 )
     local function ballCollisionDetected( event )
         if event.phase == "ended" and event.other.color then
             if event.other.color == 1 then
-                table.remove(brickTable, event.other.id)
+                table.remove(brickTable, table.indexOf(brickTable, event.other))
                 event.other:removeSelf()
                 event.other = nil
+                totalNumOfBricks = totalNumOfBricks - 1
             elseif event.other.color == 2 then
                 swapColor(event.other)
             elseif event.other.color == 3 then
-                for i=1, #brickTable do
-                    swapColor(brickTable[i])
+                for i,v in ipairs(brickTable) do
+                    swapColor(v)
                 end
+            elseif event.other.color == 5 then
+                timer.performWithDelay(1, endGame, 1)
+            end
+
+            if totalNumOfBricks == numOfBircksToWin then
+                timer.performWithDelay(1, endGame, 1)
             end
         end
-        -- body
     end
     ball:addEventListener("collision", ballCollisionDetected )
 
     physics.addBody( playArea, "static", {
         chain={ -display.contentCenterX,-display.contentCenterY, display.contentCenterX, -display.contentCenterY, display.contentCenterX,display.contentCenterY, -display.contentCenterX,display.contentCenterY },
         connectFirstAndLastChainVertex = true,
-        bounce = 1,
-        friction = 0,
-    })
-    physics.addBody( paddle, "static", {
-        friction = 0,
-        bounce = 1,
     })
     physics.addBody( ball, "kinimatic", {
         radius = 20,
         bounce = 1,
-        friction = 0,
     })
+    physics.addBody( endArea, "static", {
+        bounce = 0,
+        friction = 1
+    })
+
+    physics.addBody( paddle, "static", {
+        bounce = 0,
+        friction = 1
+    })
+
+    for i=1,totalNumOfBricks do
+        if i <= numRed then colorTable[i] = red
+        elseif i <= numRed+numBlue then colorTable[i] = blue
+        elseif i <= numRed+numBlue+numYellow then colorTable[i] = yellow
+        else colorTable[i] = gray
+        end
+    end
+
 end
 
 
@@ -101,32 +197,37 @@ function scene:show( event )
 
     if ( phase == "will" ) then
         -- Called when the scene is still off screen (but is about to come on screen).
-        
-        local function setColor( obj )
 
+        local function setColor( obj, row )
+            local idx = math.random(1,table.getn(colorTable))
+            obj.color = colorTable[idx]
+            table.remove(colorTable, idx)
+            if obj.color == red then obj:setFillColor( paintRed )
+            elseif obj.color == blue then obj:setFillColor( paintBlue )
+            elseif obj.color == yellow then obj:setFillColor( paintYellow )
+            elseif obj.color == gray then obj:setFillColor( paintGray )
+            end
         end
 
         local x, y = 90, 100
         local brickId = 1
         for i=1,4 do
             for j=1,6 do
-                brickTable[brickId] = display.newRect(x, y, 98, 38)
+                brickTable[brickId] = display.newRoundedRect(x, y, 98, 38, 6)
                 brick = brickTable[brickId]
                 brick.anchorX=0;brick.anchorY=0
-                brick.id = brickId
-                brick.color = 2
-                brick:setFillColor(0,0,1)
-                physics.addBody(brick, "static" ) 
+                setColor( brick, i )
+                physics.addBody( brick, "static" )
                 sceneGroup:insert( brick )
                 x = x + 100; brickId = brickId + 1
             end
             if i == 1 or i == 3 then x = 30 else x = 90 end
-            y = y + 40
+            y = y + 60
         end
 
 
     elseif ( phase == "did" ) then
-        ball:applyForce(0, 8000)
+        ball:applyForce(2, 10)
         -- Called when the scene is now on screen.
         -- Insert code here to make the scene come alive.
         -- Example: start timers, begin animation, play audio, etc.
