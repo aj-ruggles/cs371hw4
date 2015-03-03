@@ -41,15 +41,15 @@ local paintYellow = {
 
 local paintRed = {
     type = "gradient",
-    color1 = { .8,0,0 },
-    color2 = { 1,0,0 },
+    color1 = { 0.6980392156862745, 0.09411764705882353, 0.0 },
+    color2 = { 1.0, 0.2235294117647059, 0.09803921568627451 },
     direction = "down"
 }
 
 local paintBlue = {
     type = "gradient",
-    color1 = { 0,0,.8 },
-    color2 = { 0,0,1 },
+    color1 = { 0.0, 0.33725490196078434, 0.6980392156862745 },
+    color2 = { .15294117647058825, 0.5607843137254902, 1.0 },
     direction = "down"
 }
 
